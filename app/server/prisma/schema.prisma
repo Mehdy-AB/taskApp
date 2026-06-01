@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  VIEWER
+}
+ 
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id         Int   @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String 
+  role       UserRole @default(VIEWER)
+  createdAt    DateTime @default(now()) 
+  updatedAt    DateTime @updatedAt 
+
+  employeesCreated Employee[]    @relation("CreatedBy")
+  employeesUpdated Employee[]    @relation("UpdatedBy")
+  activityLogs     ActivityLog[]
+
+  @@map("users")
+  @@index([email])
+  @@index([role])
+  @@index([createdAt])
+  @@index([updatedAt])
+}
+
+model Department {
+  id        Int   @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  employees Employee[]
+
+  @@map("departments")
+}
+
+model Employee {
+  id           Int         @id @default(autoincrement())
+  fullName     String         
+  email        String         @unique
+  departmentId Int         
+  jobTitle         String         
+  status       EmployeeStatus @default(ACTIVE)
+  isDeleted    Boolean        @default(false) 
+  deletedAt    DateTime?      
+  createdById  Int         
+  updatedById  Int?        
+  createdAt    DateTime       @default(now()) 
+  updatedAt    DateTime       @updatedAt 
+
+  department   Department    @relation(fields: [departmentId], references: [id])
+  createdBy    User          @relation("CreatedBy", fields: [createdById], references: [id])
+  updatedBy    User?         @relation("UpdatedBy", fields: [updatedById], references: [id])
+  activityLogs ActivityLog[]
+
+  @@map("employees")
+  @@index([fullName])
+  @@index([email])
+  @@index([departmentId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([updatedAt])
+}
+
+enum ActivityAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model ActivityLog {
+  id         Int   @id @default(autoincrement())
+  userId     Int   
+  employeeId Int?  
+  action     ActivityAction
+  payload    Json?
+  createdAt  DateTime @default(now()) 
+
+  user     User      @relation(fields: [userId], references: [id])
+  employee Employee? @relation(fields: [employeeId], references: [id])
+
+  @@map("activity_logs")
+}
