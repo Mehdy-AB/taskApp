@@ -15,6 +15,8 @@ export interface Employee {
   department: string;
   jobTitle: string;
   status: EmployeeStatus;
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface PaginatedResponse<T> {

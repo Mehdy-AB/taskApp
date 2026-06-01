@@ -8,10 +8,10 @@ interface Stats {
 }
 
 const CARDS = [
-  { key: 'total'       as const, label: 'Total',       icon: 'solar:users-group-rounded-linear', bg: 'bg-[#364dff]/10', color: 'text-[#364dff]'  },
-  { key: 'active'      as const, label: 'Active',      icon: 'solar:user-check-rounded-linear',  bg: 'bg-emerald-50',   color: 'text-emerald-600' },
-  { key: 'inactive'    as const, label: 'Inactive',    icon: 'solar:user-cross-rounded-linear',  bg: 'bg-slate-100',    color: 'text-slate-500'  },
-  { key: 'departments' as const, label: 'Departments', icon: 'solar:buildings-linear',           bg: 'bg-violet-50',    color: 'text-violet-600' },
+  { key: 'total'       as const, label: 'Total',       icon: 'solar:users-group-rounded-linear', bg: 'bg-[#364dff]/10',                             color: 'text-[#364dff]'                          },
+  { key: 'active'      as const, label: 'Active',      icon: 'solar:user-check-rounded-linear',  bg: 'bg-emerald-50 dark:bg-emerald-500/10',         color: 'text-emerald-600 dark:text-emerald-400'  },
+  { key: 'inactive'    as const, label: 'Inactive',    icon: 'solar:user-cross-rounded-linear',  bg: 'bg-slate-100 dark:bg-slate-700/50',            color: 'text-slate-500 dark:text-slate-400'      },
+  { key: 'departments' as const, label: 'Departments', icon: 'solar:buildings-linear',           bg: 'bg-violet-50 dark:bg-violet-500/10',           color: 'text-violet-600 dark:text-violet-400'    },
 ];
 
 export function StatCards({ total, active, inactive, departments }: Stats) {
@@ -26,9 +26,9 @@ export function StatCards({ total, active, inactive, departments }: Stats) {
               <div className={`p-2 ${bg} rounded-lg ${color} shrink-0`}>
                 <iconify-icon icon={icon} width="20" />
               </div>
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{label}</span>
+              <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">{label}</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">{values[key]}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{values[key]}</p>
           </CardContent>
         </Card>
       ))}
