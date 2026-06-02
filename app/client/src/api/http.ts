@@ -11,27 +11,28 @@ export class ApiError extends Error {
   }
 }
 
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('accessToken');
-}
+// ── module-level auth state set by <AuthSync> ─────────────────────────────────
+
+let _token: string | null = null;
+let _onUnauthorized: (() => void) | null = null;
+
+export function setToken(token: string | null) { _token = token; }
+export function setUnauthorizedHandler(fn: () => void) { _onUnauthorized = fn; }
+
+// ── core fetch ────────────────────────────────────────────────────────────────
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getToken();
-
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
       ...(init.headers ?? {}),
     },
   });
 
   if (res.status === 401) {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    _onUnauthorized?.();
     throw new ApiError(401, {}, 'Unauthorized');
   }
 

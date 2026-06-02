@@ -20,7 +20,18 @@ function toQueryString(params: ListEmployeesQuery): string {
   return s ? `?${s}` : '';
 }
 
+export interface EmployeeStats {
+  total: number;
+  active: number;
+  inactive: number;
+  departments: number;
+}
+
 export const employeesService = {
+  stats(): Promise<EmployeeStats> {
+    return http.get<EmployeeStats>('/employees/stats');
+  },
+
   list(query: ListEmployeesQuery = {}): Promise<PaginatedEmployees> {
     return http.get<PaginatedEmployees>(`/employees${toQueryString(query)}`);
   },

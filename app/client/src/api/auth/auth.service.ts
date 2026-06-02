@@ -13,9 +13,13 @@ export const authService = {
     return http.get<AuthUser>('/auth/me');
   },
 
-  logout(): void {
+  clearSession(): void {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('user');
+  },
+
+  logout(): void {
+    this.clearSession();
     window.location.href = '/login';
   },
 

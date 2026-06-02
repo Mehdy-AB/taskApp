@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Trash2 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -10,9 +12,24 @@ import type { Employee } from '@/src/lib/types/api';
 interface Props {
   employee: Employee | null;
   onClose: () => void;
+  onConfirm: () => Promise<void>;
 }
 
-export function DeleteDialog({ employee, onClose }: Props) {
+export function DeleteDialog({ employee, onClose, onConfirm }: Props) {
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete employee.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog open={employee !== null} onOpenChange={isOpen => { if (!isOpen) onClose(); }}>
       <DialogContent className="sm:max-w-sm text-center" showCloseButton={false}>
@@ -30,12 +47,13 @@ export function DeleteDialog({ employee, onClose }: Props) {
         </p>
 
         <div className="flex gap-3 -mx-4 -mb-4 rounded-b-xl border-t bg-muted/50 p-4">
-          <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button
             className="flex-1 bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/25"
-            onClick={onClose}
+            onClick={handleConfirm}
+            disabled={loading}
           >
-            Delete
+            {loading ? 'Deleting…' : 'Delete'}
           </Button>
         </div>
       </DialogContent>

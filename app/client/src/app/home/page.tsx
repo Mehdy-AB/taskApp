@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { Sun, Moon, Plus, LogOut } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import type { Employee } from '@/src/lib/types/api';
-import { MOCK_EMPLOYEES, DEPARTMENTS, type SortKey, type SortDir } from '@/src/lib/mock-data';
+import type { Employee, Department, CreateEmployeeRequest, UpdateEmployeeRequest, EmployeeStatus } from '@/src/lib/types/api';
+import { employeesService, type EmployeeStats } from '@/src/api/employees/employees.service';
+import { departmentsService } from '@/src/api/departments/departments.service';
+import { type SortKey, type SortDir } from '@/src/lib/mock-data';
 import { StatCards }         from '@/src/components/employees/StatCards';
 import { FilterBar }         from '@/src/components/employees/FilterBar';
 import { EmployeeTable }     from '@/src/components/employees/EmployeeTable';
@@ -16,60 +20,127 @@ import { useTheme }          from '@/src/lib/use-theme';
 
 const PAGE_SIZE = 5;
 
+function getInitials(email: string) {
+  return email.split('@')[0].slice(0, 2).toUpperCase();
+}
+
+function Spinner() {
+  return (
+    <div className="min-h-screen bg-[#F8F9FF] dark:bg-slate-950 flex items-center justify-center">
+      <svg className="animate-spin size-8 text-[#364dff]" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+      </svg>
+    </div>
+  );
+}
+
 export default function HomePage() {
+  const { data: session, status } = useSession();
   const { isDark, toggle } = useTheme();
 
-  // Departments can grow when user creates new ones in the modal
-  const [departments, setDepartments] = useState<string[]>([...DEPARTMENTS]);
-
+  // ── filter / sort / page ──────────────────────────────────────────────────
   const [search, setSearch]   = useState('');
   const [department, setDept] = useState('');
-  const [status, setStatus]   = useState('');
+  const [status2, setStatus2] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('fullName');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [page, setPage]       = useState(1);
 
+  // ── server data ───────────────────────────────────────────────────────────
+  const [employees, setEmployees]       = useState<Employee[]>([]);
+  const [totalFiltered, setTotalFiltered] = useState(0);
+  const [totalPages, setTotalPages]     = useState(1);
+  const [stats, setStats]               = useState<EmployeeStats>({ total: 0, active: 0, inactive: 0, departments: 0 });
+  const [departments, setDepartments]   = useState<Department[]>([]);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [refreshKey, setRefreshKey]     = useState(0);
+
+  // ── modal state ───────────────────────────────────────────────────────────
   const [showModal, setShowModal]       = useState(false);
   const [editTarget, setEditTarget]     = useState<Employee | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    const result = MOCK_EMPLOYEES.filter(emp => {
-      const matchSearch = !q || emp.fullName.toLowerCase().includes(q) || emp.email.toLowerCase().includes(q);
-      const matchDept   = !department || emp.department === department;
-      const matchStatus = !status || emp.status === status;
-      return matchSearch && matchDept && matchStatus;
-    });
-    result.sort((a, b) => {
-      const av = a[sortKey].toLowerCase();
-      const bv = b[sortKey].toLowerCase();
-      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-    });
-    return result;
-  }, [search, department, status, sortKey, sortDir]);
+  // ── load departments + stats on mount ────────────────────────────────────
+  useEffect(() => {
+    Promise.all([departmentsService.list(), employeesService.stats()])
+      .then(([depts, s]) => { setDepartments(depts); setStats(s); })
+      .catch(() => toast.error('Failed to load dashboard data.'));
+  }, [refreshKey]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // ── load employees when filters / sort / page change ─────────────────────
+  useEffect(() => {
+    setTableLoading(true);
+    employeesService.list({
+      search:     search     || undefined,
+      department: department || undefined,
+      status:     (status2   || undefined) as EmployeeStatus | undefined,
+      sortBy:     sortKey,
+      sortDir,
+      page,
+      pageSize:   PAGE_SIZE,
+    })
+      .then(res => {
+        setEmployees(res.data);
+        setTotalFiltered(res.total);
+        setTotalPages(res.totalPages);
+      })
+      .catch(() => toast.error('Failed to load employees.'))
+      .finally(() => setTableLoading(false));
+  }, [search, department, status2, sortKey, sortDir, page, refreshKey]);
 
-  const stats = {
-    total:       MOCK_EMPLOYEES.length,
-    active:      MOCK_EMPLOYEES.filter(e => e.status === 'ACTIVE').length,
-    inactive:    MOCK_EMPLOYEES.filter(e => e.status === 'INACTIVE').length,
-    departments: departments.length,
-  };
+  const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
+  // ── handlers ──────────────────────────────────────────────────────────────
   const handleSort = (key: SortKey) => {
     if (key === sortKey) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('asc'); }
     setPage(1);
   };
 
-  const handleReset = () => { setSearch(''); setDept(''); setStatus(''); setPage(1); };
+  const handleReset = () => { setSearch(''); setDept(''); setStatus2(''); setPage(1); };
 
-  const handleAddDepartment = (name: string) => {
-    setDepartments(prev => prev.includes(name) ? prev : [...prev, name]);
+  const handleCreateDepartment = async (name: string): Promise<Department> => {
+    try {
+      const dept = await departmentsService.create({ name });
+      setDepartments(prev => [...prev, dept]);
+      toast.success(`Department "${dept.name}" created.`);
+      return dept;
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create department.');
+      throw err;
+    }
   };
+
+  const handleSubmit = async (data: CreateEmployeeRequest | UpdateEmployeeRequest) => {
+    if (editTarget) {
+      await employeesService.update(editTarget.id, data as UpdateEmployeeRequest);
+      toast.success('Employee updated successfully.');
+    } else {
+      await employeesService.create(data as CreateEmployeeRequest);
+      toast.success('Employee created successfully.');
+    }
+    triggerRefresh();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await employeesService.remove(deleteTarget.id);
+      toast.success(`${deleteTarget.fullName} was deleted.`);
+      triggerRefresh();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete employee.');
+      throw err;
+    }
+  };
+
+  if (status === 'loading') return <Spinner />;
+
+  const user     = session?.user;
+  const isAdmin  = (user as any)?.role === 'ADMIN';
+  const initials = user?.email ? getInitials(user.email) : '??';
+  const userName = user?.email?.split('@')[0].replace(/[._]/g, ' ') ?? '';
 
   return (
     <div className="min-h-screen bg-[#F8F9FF] dark:bg-slate-950 transition-colors">
@@ -85,7 +156,6 @@ export default function HomePage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Theme toggle */}
           <button
             suppressHydrationWarning
             onClick={toggle}
@@ -94,20 +164,22 @@ export default function HomePage() {
           >
             {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
+
           <Popover>
             <PopoverTrigger className="w-8 h-8 rounded-full bg-[#364dff]/10 text-[#364dff] flex items-center justify-center text-xs font-bold select-none hover:bg-[#364dff]/20 transition-colors outline-none">
-              AU
+              {initials}
             </PopoverTrigger>
             <PopoverContent align="end" className="w-56 p-0 gap-0 overflow-hidden">
-              {/* User info */}
               <div className="px-4 py-3">
-                <p className="text-sm font-semibold text-foreground">Admin User</p>
-                <p className="text-xs text-muted-foreground mt-0.5">admin@company.com</p>
+                <p className="text-sm font-semibold text-foreground capitalize">{userName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{user?.email}</p>
+                <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#364dff]/10 text-[#364dff]">
+                  {(user as any)?.role}
+                </span>
               </div>
               <Separator />
-              {/* Logout */}
               <button
-                onClick={() => { /* Phase 3: signOut() */ }}
+                onClick={() => signOut({ callbackUrl: '/login' })}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
               >
                 <LogOut className="size-3.5" />
@@ -124,44 +196,53 @@ export default function HomePage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Team Members</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {stats.total} employees across {departments.length} departments
+              {stats.total} employees across {stats.departments} departments
             </p>
           </div>
-          <Button
-            onClick={() => { setEditTarget(null); setShowModal(true); }}
-            className="gap-2 shadow-md shadow-primary/20"
-          >
-            <Plus className="size-4" />
-            Add Employee
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={() => { setEditTarget(null); setShowModal(true); }}
+              className="gap-2 shadow-md shadow-primary/20"
+            >
+              <Plus className="size-4" />
+              Add Employee
+            </Button>
+          )}
         </div>
 
-        <StatCards {...stats} />
+        <StatCards
+          total={stats.total}
+          active={stats.active}
+          inactive={stats.inactive}
+          departments={stats.departments}
+        />
 
         <FilterBar
           search={search}
           department={department}
-          status={status}
-          departments={departments}
+          status={status2}
+          departments={departments.map(d => d.name)}
           onSearch={v => { setSearch(v); setPage(1); }}
           onDepartment={v => { setDept(v); setPage(1); }}
-          onStatus={v => { setStatus(v); setPage(1); }}
+          onStatus={v => { setStatus2(v); setPage(1); }}
           onReset={handleReset}
         />
 
-        <EmployeeTable
-          rows={paginated}
-          totalFiltered={filtered.length}
-          page={page}
-          totalPages={totalPages}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={handleSort}
-          onPageChange={setPage}
-          onEdit={emp => { setEditTarget(emp); setShowModal(true); }}
-          onDelete={emp => setDeleteTarget(emp)}
-          onReset={handleReset}
-        />
+        <div className={tableLoading ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'}>
+          <EmployeeTable
+            rows={employees}
+            totalFiltered={totalFiltered}
+            page={page}
+            totalPages={totalPages}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+            onPageChange={setPage}
+            onEdit={emp => { setEditTarget(emp); setShowModal(true); }}
+            onDelete={emp => setDeleteTarget(emp)}
+            onReset={handleReset}
+          />
+        </div>
       </main>
 
       <EmployeeFormModal
@@ -169,12 +250,14 @@ export default function HomePage() {
         onClose={() => setShowModal(false)}
         employee={editTarget}
         departments={departments}
-        onCreateDepartment={handleAddDepartment}
+        onCreateDepartment={handleCreateDepartment}
+        onSubmit={handleSubmit}
       />
 
       <DeleteDialog
         employee={deleteTarget}
         onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
       />
     </div>
   );

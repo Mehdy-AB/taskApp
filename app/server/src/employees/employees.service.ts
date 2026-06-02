@@ -43,6 +43,16 @@ function buildOrderBy(sortBy?: SortableField, sortDir: 'asc' | 'desc' = 'asc') {
 export class EmployeesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async stats() {
+    const [total, active, inactive, departments] = await this.prisma.$transaction([
+      this.prisma.employee.count({ where: { isDeleted: false } }),
+      this.prisma.employee.count({ where: { isDeleted: false, status: 'ACTIVE' } }),
+      this.prisma.employee.count({ where: { isDeleted: false, status: 'INACTIVE' } }),
+      this.prisma.department.count(),
+    ]);
+    return { total, active, inactive, departments };
+  }
+
   async findAll(query: ListEmployeesDto) {
     const { search, department, status, sortBy, sortDir, page = 1, pageSize = 10 } = query;
 
