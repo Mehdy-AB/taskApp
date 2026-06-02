@@ -1,32 +1,5 @@
-export type UserRole = 'ADMIN' | 'VIEWER';
-export type EmployeeStatus = 'ACTIVE' | 'INACTIVE';
+export type { UserRole, AuthUser, AuthUser as User, LoginRequest, LoginResponse } from '@/src/api/auth/auth.types';
+export type { EmployeeStatus, EmployeeSortKey, Employee, CreateEmployeeRequest, UpdateEmployeeRequest, ListEmployeesQuery, PaginatedEmployees } from '@/src/api/employees/employees.types';
+export type { Department, CreateDepartmentRequest } from '@/src/api/departments/departments.types';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-}
-
-export interface Employee {
-  id: number;
-  fullName: string;
-  email: string;
-  department: string;
-  jobTitle: string;
-  status: EmployeeStatus;
-  createdBy: string;
-  createdAt: string;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface LoginResponse {
-  accessToken: string;
-  user: User;
-}
+export type PaginatedResponse<T> = { data: T[]; total: number; page: number; pageSize: number; totalPages: number };
