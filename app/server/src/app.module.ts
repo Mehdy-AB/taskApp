@@ -4,6 +4,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { EmployeesModule } from './employees/employees.module.js';
 import { DepartmentsModule } from './departments/departments.module.js';
+import { ActivityLogsModule } from './activity-logs/activity-logs.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -14,6 +15,7 @@ import { AppService } from './app.service.js';
     AuthModule,
     EmployeesModule,
     DepartmentsModule,
+    ActivityLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -16,8 +16,9 @@ import { FilterBar }         from '@/src/components/employees/FilterBar';
 import { EmployeeTable }     from '@/src/components/employees/EmployeeTable';
 import { EmployeeFormModal } from '@/src/components/employees/EmployeeFormModal';
 import { DeleteDialog }      from '@/src/components/employees/DeleteDialog';
-import { Button }            from '@/components/ui/button';
-import { useTheme }          from '@/src/lib/use-theme';
+import { Button }               from '@/components/ui/button';
+import { useTheme }             from '@/src/lib/use-theme';
+import { ActivityLogSection }   from '@/src/components/activity/ActivityLogSection';
 
 const PAGE_SIZE = 5;
 
@@ -39,6 +40,7 @@ function Spinner() {
 export default function HomePage() {
   const { data: session, status } = useSession();
   const { isDark, toggle } = useTheme();
+  const [activeTab, setActiveTab] = useState<'employees' | 'logs'>('employees');
 
   // ── filter / sort / page ──────────────────────────────────────────────────
   const [search, setSearch]   = useState('');        // immediate — from FilterBar
@@ -226,57 +228,87 @@ export default function HomePage() {
 
       {/* Page content */}
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Team Members</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {stats.total} employees across {stats.departments} departments
-            </p>
-          </div>
-          {isAdmin && (
-            <Button
-              onClick={() => { setEditTarget(null); setShowModal(true); }}
-              className="gap-2 shadow-md shadow-primary/20"
+
+        {/* Tab bar */}
+        <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
+          {(['employees', 'logs'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+                activeTab === tab
+                  ? 'border-[#364dff] text-[#364dff]'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
             >
-              <Plus className="size-4" />
-              Add Employee
-            </Button>
-          )}
+              {tab === 'employees' ? 'Team Members' : 'Activity Log'}
+            </button>
+          ))}
         </div>
 
-        <StatCards
-          total={stats.total}
-          active={stats.active}
-          inactive={stats.inactive}
-          departments={stats.departments}
-          loading={statsLoading}
-        />
+        {activeTab === 'employees' ? (
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Team Members</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  {stats.total} employees across {stats.departments} departments
+                </p>
+              </div>
+              {isAdmin && (
+                <Button
+                  onClick={() => { setEditTarget(null); setShowModal(true); }}
+                  className="gap-2 shadow-md shadow-primary/20"
+                >
+                  <Plus className="size-4" />
+                  Add Employee
+                </Button>
+              )}
+            </div>
 
-        <FilterBar
-          search={search}
-          department={department}
-          status={status2}
-          departments={departments.map(d => d.name)}
-          onSearch={v => { setSearch(v); setPage(1); }}
-          onDepartment={v => { setDept(v); setPage(1); }}
-          onStatus={v => { setStatus2(v); setPage(1); }}
-          onReset={handleReset}
-        />
+            <StatCards
+              total={stats.total}
+              active={stats.active}
+              inactive={stats.inactive}
+              departments={stats.departments}
+              loading={statsLoading}
+            />
 
-        <EmployeeTable
-          rows={displayRows}
-          totalFiltered={displayTotal}
-          page={page}
-          totalPages={displayPages}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          loading={tableLoading && !search}
-          onSort={handleSort}
-          onPageChange={setPage}
-          onEdit={emp => { setEditTarget(emp); setShowModal(true); }}
-          onDelete={emp => setDeleteTarget(emp)}
-          onReset={handleReset}
-        />
+            <FilterBar
+              search={search}
+              department={department}
+              status={status2}
+              departments={departments.map(d => d.name)}
+              onSearch={v => { setSearch(v); setPage(1); }}
+              onDepartment={v => { setDept(v); setPage(1); }}
+              onStatus={v => { setStatus2(v); setPage(1); }}
+              onReset={handleReset}
+            />
+
+            <EmployeeTable
+              rows={displayRows}
+              totalFiltered={displayTotal}
+              page={page}
+              totalPages={displayPages}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              loading={tableLoading && !search}
+              onSort={handleSort}
+              onPageChange={setPage}
+              onEdit={emp => { setEditTarget(emp); setShowModal(true); }}
+              onDelete={emp => setDeleteTarget(emp)}
+              onReset={handleReset}
+            />
+          </>
+        ) : (
+          <>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Activity Log</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">All create, update, and delete events.</p>
+            </div>
+            <ActivityLogSection status={status} />
+          </>
+        )}
       </main>
 
       <EmployeeFormModal
