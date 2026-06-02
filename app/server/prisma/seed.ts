@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { PrismaClient } from '../generated/prisma/client.js';
 import * as bcrypt from 'bcrypt';
 
@@ -42,12 +43,20 @@ async function main() {
     deptMap[name] = dept.id;
   }
 
-  // Upsert admin user
-  const adminHash = await bcrypt.hash('password', 10);
+  // Upsert users
+  const adminHash  = await bcrypt.hash('password', 10);
+  const viewerHash = await bcrypt.hash('password', 10);
+
   const admin = await prisma.user.upsert({
     where: { email: 'admin@company.com' },
     update: {},
     create: { email: 'admin@company.com', passwordHash: adminHash, role: 'ADMIN' },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'viewer@company.com' },
+    update: {},
+    create: { email: 'viewer@company.com', passwordHash: viewerHash, role: 'VIEWER' },
   });
 
   // Upsert employees
@@ -66,7 +75,7 @@ async function main() {
     });
   }
 
-  console.log(`Done — ${DEPARTMENTS.length} depts, ${EMPLOYEES.length} employees, 1 admin (admin@company.com / password)`);
+  console.log(`Done — ${DEPARTMENTS.length} depts, ${EMPLOYEES.length} employees, admin (admin@company.com / password), viewer (viewer@company.com / password)`);
 }
 
 main()
