@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { setToken, setUnauthorizedHandler } from '@/src/api/http';
+import { setToken, setUnauthorizedHandler } from '@/src/api/axios';
 
 export function AuthSync() {
   const { data: session } = useSession();

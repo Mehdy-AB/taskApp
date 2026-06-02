@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Sun, Moon, Plus, LogOut } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
@@ -10,6 +10,7 @@ import type { Employee, Department, CreateEmployeeRequest, UpdateEmployeeRequest
 import { employeesService, type EmployeeStats } from '@/src/api/employees/employees.service';
 import { departmentsService } from '@/src/api/departments/departments.service';
 import { type SortKey, type SortDir } from '@/src/lib/mock-data';
+import { useDebounce } from '@/src/lib/use-debounce';
 import { StatCards }         from '@/src/components/employees/StatCards';
 import { FilterBar }         from '@/src/components/employees/FilterBar';
 import { EmployeeTable }     from '@/src/components/employees/EmployeeTable';
@@ -40,7 +41,8 @@ export default function HomePage() {
   const { isDark, toggle } = useTheme();
 
   // ── filter / sort / page ──────────────────────────────────────────────────
-  const [search, setSearch]   = useState('');
+  const [search, setSearch]   = useState('');        // immediate — from FilterBar
+  const debouncedSearch       = useDebounce(search, 300); // triggers API
   const [department, setDept] = useState('');
   const [status2, setStatus2] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('fullName');
@@ -48,12 +50,14 @@ export default function HomePage() {
   const [page, setPage]       = useState(1);
 
   // ── server data ───────────────────────────────────────────────────────────
-  const [employees, setEmployees]       = useState<Employee[]>([]);
-  const [totalFiltered, setTotalFiltered] = useState(0);
-  const [totalPages, setTotalPages]     = useState(1);
+  const [employees, setEmployees]           = useState<Employee[]>([]);
+  const [currentPageIds, setCurrentPageIds] = useState<number[]>([]);
+  const [totalFiltered, setTotalFiltered]   = useState(0);
+  const [totalPages, setTotalPages]         = useState(1);
   const [stats, setStats]               = useState<EmployeeStats>({ total: 0, active: 0, inactive: 0, departments: 0 });
   const [departments, setDepartments]   = useState<Department[]>([]);
-  const [tableLoading, setTableLoading] = useState(false);
+  const [tableLoading, setTableLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [refreshKey, setRefreshKey]     = useState(0);
 
   // ── modal state ───────────────────────────────────────────────────────────
@@ -63,16 +67,20 @@ export default function HomePage() {
 
   // ── load departments + stats on mount ────────────────────────────────────
   useEffect(() => {
+    if (status !== 'authenticated') return;
+    setStatsLoading(true);
     Promise.all([departmentsService.list(), employeesService.stats()])
       .then(([depts, s]) => { setDepartments(depts); setStats(s); })
-      .catch(() => toast.error('Failed to load dashboard data.'));
-  }, [refreshKey]);
+      .catch(() => toast.error('Failed to load dashboard data.'))
+      .finally(() => setStatsLoading(false));
+  }, [status, refreshKey]);
 
-  // ── load employees when filters / sort / page change ─────────────────────
+  // ── load employees when debounced search / other filters / page change ─────
   useEffect(() => {
+    if (status !== 'authenticated') return;
     setTableLoading(true);
     employeesService.list({
-      search:     search     || undefined,
+      search:     debouncedSearch || undefined,
       department: department || undefined,
       status:     (status2   || undefined) as EmployeeStatus | undefined,
       sortBy:     sortKey,
@@ -81,15 +89,41 @@ export default function HomePage() {
       pageSize:   PAGE_SIZE,
     })
       .then(res => {
-        setEmployees(res.data);
+        setCurrentPageIds(res.data.map(e => e.id));
+        setEmployees(prev => {
+          const existingIds = new Set(prev.map(e => e.id));
+          const toAdd = res.data.filter(e => !existingIds.has(e.id));
+          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+        });
         setTotalFiltered(res.total);
         setTotalPages(res.totalPages);
       })
       .catch(() => toast.error('Failed to load employees.'))
       .finally(() => setTableLoading(false));
-  }, [search, department, status2, sortKey, sortDir, page, refreshKey]);
+  }, [status, debouncedSearch, department, status2, sortKey, sortDir, page, refreshKey]);
 
   const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
+  // ── local filter while debounce is pending ────────────────────────────────
+  // Immediately filter the already-loaded rows so the table responds to typing
+  // before the API call fires. Once debouncedSearch catches up, the API result
+  // (employees) takes over and this memo returns it unchanged.
+  const isPending = search !== debouncedSearch;
+
+  const displayRows = useMemo(() => {
+    if (isPending && search) {
+      const q = search.toLowerCase();
+      return employees.filter(e =>
+        e.fullName.toLowerCase().includes(q) ||
+        e.email.toLowerCase().includes(q),
+      );
+    }
+    const byId = new Map(employees.map(e => [e.id, e]));
+    return currentPageIds.map(id => byId.get(id)).filter((e): e is Employee => !!e);
+  }, [isPending, search, employees, currentPageIds]);
+
+  const displayTotal = isPending ? displayRows.length : totalFiltered;
+  const displayPages = isPending ? Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE)) : totalPages;
 
   // ── handlers ──────────────────────────────────────────────────────────────
   const handleSort = (key: SortKey) => {
@@ -215,6 +249,7 @@ export default function HomePage() {
           active={stats.active}
           inactive={stats.inactive}
           departments={stats.departments}
+          loading={statsLoading}
         />
 
         <FilterBar
@@ -228,21 +263,20 @@ export default function HomePage() {
           onReset={handleReset}
         />
 
-        <div className={tableLoading ? 'opacity-60 pointer-events-none transition-opacity' : 'transition-opacity'}>
-          <EmployeeTable
-            rows={employees}
-            totalFiltered={totalFiltered}
-            page={page}
-            totalPages={totalPages}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleSort}
-            onPageChange={setPage}
-            onEdit={emp => { setEditTarget(emp); setShowModal(true); }}
-            onDelete={emp => setDeleteTarget(emp)}
-            onReset={handleReset}
-          />
-        </div>
+        <EmployeeTable
+          rows={displayRows}
+          totalFiltered={displayTotal}
+          page={page}
+          totalPages={displayPages}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          loading={tableLoading && !search}
+          onSort={handleSort}
+          onPageChange={setPage}
+          onEdit={emp => { setEditTarget(emp); setShowModal(true); }}
+          onDelete={emp => setDeleteTarget(emp)}
+          onReset={handleReset}
+        />
       </main>
 
       <EmployeeFormModal

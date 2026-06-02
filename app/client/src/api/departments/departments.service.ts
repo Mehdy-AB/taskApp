@@ -1,12 +1,12 @@
-import { http } from '../http';
+import { apiAxios } from '../axios';
 import type { Department, CreateDepartmentRequest } from './departments.types';
 
 export const departmentsService = {
   list(): Promise<Department[]> {
-    return http.get<Department[]>('/departments');
+    return apiAxios.get<Department[]>('/departments').then(r => r.data);
   },
 
   create(data: CreateDepartmentRequest): Promise<Department> {
-    return http.post<Department>('/departments', data);
+    return apiAxios.post<Department>('/departments', data).then(r => r.data);
   },
 };

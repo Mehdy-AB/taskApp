@@ -5,6 +5,7 @@ interface Stats {
   active: number;
   inactive: number;
   departments: number;
+  loading?: boolean;
 }
 
 const CARDS = [
@@ -14,7 +15,7 @@ const CARDS = [
   { key: 'departments' as const, label: 'Departments', icon: 'solar:buildings-linear',           bg: 'bg-violet-50 dark:bg-violet-500/10',           color: 'text-violet-600 dark:text-violet-400'    },
 ];
 
-export function StatCards({ total, active, inactive, departments }: Stats) {
+export function StatCards({ total, active, inactive, departments, loading }: Stats) {
   const values = { total, active, inactive, departments };
 
   return (
@@ -28,7 +29,11 @@ export function StatCards({ total, active, inactive, departments }: Stats) {
               </div>
               <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">{label}</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{values[key]}</p>
+            {loading ? (
+              <div className="h-8 w-14 rounded-md bg-slate-200 dark:bg-slate-700 animate-pulse" />
+            ) : (
+              <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{values[key]}</p>
+            )}
           </CardContent>
         </Card>
       ))}

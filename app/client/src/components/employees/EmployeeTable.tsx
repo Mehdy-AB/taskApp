@@ -24,6 +24,7 @@ interface Props {
   totalPages: number;
   sortKey: SortKey;
   sortDir: SortDir;
+  loading?: boolean;
   onSort: (key: SortKey) => void;
   onPageChange: (p: number) => void;
   onEdit: (emp: Employee) => void;
@@ -49,8 +50,32 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   );
 }
 
+function SkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+        <TableRow key={i} className="border-slate-100 dark:border-slate-800">
+          <TableCell className="px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-full bg-slate-200 dark:bg-slate-700 animate-pulse shrink-0" />
+              <div className="h-3.5 w-28 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" />
+            </div>
+          </TableCell>
+          <TableCell className="px-6 py-4"><div className="h-3.5 w-20 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" /></TableCell>
+          <TableCell className="px-6 py-4 hidden md:table-cell"><div className="h-3.5 w-24 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" /></TableCell>
+          <TableCell className="px-6 py-4"><div className="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-700 animate-pulse" /></TableCell>
+          <TableCell className="px-6 py-4 hidden xl:table-cell"><div className="h-3.5 w-24 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" /></TableCell>
+          <TableCell className="px-6 py-4 hidden xl:table-cell"><div className="h-3.5 w-20 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" /></TableCell>
+          <TableCell className="px-6 py-4 hidden lg:table-cell"><div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" /></TableCell>
+          <TableCell className="px-6 py-4" />
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
 export function EmployeeTable({
-  rows, totalFiltered, page, totalPages, sortKey, sortDir,
+  rows, totalFiltered, page, totalPages, sortKey, sortDir, loading,
   onSort, onPageChange, onEdit, onDelete, onReset,
 }: Props) {
   const start = (page - 1) * PAGE_SIZE + 1;
@@ -82,7 +107,7 @@ export function EmployeeTable({
         </TableHeader>
 
         <TableBody>
-          {rows.length === 0 ? (
+          {loading ? <SkeletonRows /> : rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="px-6 py-16 text-center">
                 <iconify-icon icon="solar:users-group-rounded-linear" width="40" className="text-slate-300 dark:text-slate-600 block mx-auto mb-3" />

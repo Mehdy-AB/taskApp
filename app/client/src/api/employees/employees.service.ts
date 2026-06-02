@@ -1,4 +1,4 @@
-import { http } from '../http';
+import { apiAxios } from '../axios';
 import type {
   Employee,
   CreateEmployeeRequest,
@@ -6,6 +6,13 @@ import type {
   ListEmployeesQuery,
   PaginatedEmployees,
 } from './employees.types';
+
+export interface EmployeeStats {
+  total: number;
+  active: number;
+  inactive: number;
+  departments: number;
+}
 
 function toQueryString(params: ListEmployeesQuery): string {
   const q = new URLSearchParams();
@@ -20,35 +27,28 @@ function toQueryString(params: ListEmployeesQuery): string {
   return s ? `?${s}` : '';
 }
 
-export interface EmployeeStats {
-  total: number;
-  active: number;
-  inactive: number;
-  departments: number;
-}
-
 export const employeesService = {
   stats(): Promise<EmployeeStats> {
-    return http.get<EmployeeStats>('/employees/stats');
+    return apiAxios.get<EmployeeStats>('/employees/stats').then(r => r.data);
   },
 
   list(query: ListEmployeesQuery = {}): Promise<PaginatedEmployees> {
-    return http.get<PaginatedEmployees>(`/employees${toQueryString(query)}`);
+    return apiAxios.get<PaginatedEmployees>(`/employees${toQueryString(query)}`).then(r => r.data);
   },
 
   getById(id: number): Promise<Employee> {
-    return http.get<Employee>(`/employees/${id}`);
+    return apiAxios.get<Employee>(`/employees/${id}`).then(r => r.data);
   },
 
   create(data: CreateEmployeeRequest): Promise<Employee> {
-    return http.post<Employee>('/employees', data);
+    return apiAxios.post<Employee>('/employees', data).then(r => r.data);
   },
 
   update(id: number, data: UpdateEmployeeRequest): Promise<Employee> {
-    return http.patch<Employee>(`/employees/${id}`, data);
+    return apiAxios.patch<Employee>(`/employees/${id}`, data).then(r => r.data);
   },
 
   remove(id: number): Promise<void> {
-    return http.delete(`/employees/${id}`);
+    return apiAxios.delete(`/employees/${id}`).then(() => undefined);
   },
 };
